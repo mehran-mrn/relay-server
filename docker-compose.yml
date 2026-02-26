@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  relay:
+    build: .
+    restart: always
+    ports:
+      - "127.0.0.1:9000:9000"   # TCP for Host C# (Traefik TCP passthrough)
+      - "127.0.0.1:9001:9001"   # WS for Browser Viewer (Traefik HTTPS proxy)
+    environment:
+      - TCP_PORT=9000
+      - WS_PORT=9001
+      - PANEL_API_URL=${PANEL_API_URL}
+      - PANEL_API_KEY=${PANEL_API_KEY}
+    labels:
+      # WebSocket viewer route (HTTPS → WS)
+      - traefik.enable=true
+      - traefik.http.routers.relay-ws.rule=Host(`${RELAY_DOMAIN}`) && PathPrefix(`/view/`)
+      - traefik.http.routers.relay-ws.tls=true
+      - traefik.http.routers.relay-ws.entrypoints=web,websecure
+      - traefik.http.routers.relay-ws.tls.certresolver=mytlschallenge
+      - traefik.http.services.relay-ws.loadbalancer.server.port=9001
+      # Headers middleware
+      - traefik.http.middlewares.relay-ws.headers.SSLRedirect=true
+      - traefik.http.middlewares.relay-ws.headers.STSSeconds=315360000
+      - traefik.http.middlewares.relay-ws.headers.forceSTSHeader=true
+      - traefik.http.middlewares.relay-ws.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.relay-ws.headers.STSPreload=true
+      - traefik.http.routers.relay-ws.middlewares=relay-ws@docker
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
