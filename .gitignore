@@ -1,0 +1,14 @@
+# Binaries
+relay
+*.exe
+
+# Environment
+.env
+
+# Go
+vendor/
+*.test
+
+# IDE
+.vscode/
+.idea/
