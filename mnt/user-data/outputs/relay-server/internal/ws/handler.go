@@ -159,12 +159,22 @@ func (s *Server) handleViewer(w http.ResponseWriter, r *http.Request) {
 	// Send initial host status = connected
 	vc.SendHostStatus(true)
 
+	// Notify host that a viewer is now watching
+	if host := sess.GetHost(); host != nil {
+		host.SendViewerStatus(true)
+	}
+
 	// Read loop for input events from browser
 	defer func() {
 		conn.Close()
 		s.sessions.UnregisterViewer(uuid)
 		s.panel.SendEvent(uuid, "viewer", "viewer_disconnected", remoteIP)
 		log.Printf("[WS] Viewer disconnected: UUID=%s", uuid)
+
+		// Notify host that viewer is gone
+		if host := sess.GetHost(); host != nil {
+			host.SendViewerStatus(false)
+		}
 	}()
 
 	for {
