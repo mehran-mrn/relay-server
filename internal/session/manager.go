@@ -9,6 +9,8 @@ import (
 type HostConn interface {
 	// SendToHost sends raw bytes to the C# host (input packets)
 	SendToHost(data []byte) error
+	// SendViewerStatus notifies host whether a viewer is watching
+	SendViewerStatus(connected bool) error
 	// Close closes the connection
 	Close()
 	// RemoteAddr returns IP string

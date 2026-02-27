@@ -22,6 +22,7 @@ var (
 	magicRDRD = [4]byte{0x52, 0x44, 0x52, 0x44} // 0x52445244 video frame
 	magicRDPI = [4]byte{0x52, 0x44, 0x50, 0x49} // 0x52445049 ping
 	magicRDPP = [4]byte{0x52, 0x44, 0x50, 0x50} // 0x52445050 pong
+	magicRDVS = [4]byte{0x52, 0x44, 0x56, 0x53} // 0x52445653 viewer status
 )
 
 // hostConn wraps a net.Conn and implements session.HostConn
@@ -34,6 +35,19 @@ func (h *hostConn) SendToHost(data []byte) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	_, err := h.conn.Write(data)
+	return err
+}
+
+// SendViewerStatus notifies the Host whether a Viewer is connected
+// [4 bytes magic RDVS][1 byte status: 0x01=connected, 0x00=disconnected]
+func (h *hostConn) SendViewerStatus(connected bool) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	status := byte(0x00)
+	if connected {
+		status = 0x01
+	}
+	_, err := h.conn.Write(append(magicRDVS[:], status))
 	return err
 }
 
