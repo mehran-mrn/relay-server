@@ -165,10 +165,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 	log.Printf("[TCP] Host connected: UUID=%s", uuid)
 
 	// Step 4: Handle packets
-	s.readLoop(conn, sess, uuid, remoteIP)
+	s.readLoop(conn, hc, sess, uuid, remoteIP)
 }
 
-func (s *Server) readLoop(conn net.Conn, sess *session.Session, uuid, remoteIP string) {
+func (s *Server) readLoop(conn net.Conn, hc *hostConn, sess *session.Session, uuid, remoteIP string) {
 	defer func() {
 		conn.Close()
 		s.sessions.UnregisterHost(uuid)
@@ -202,9 +202,8 @@ func (s *Server) readLoop(conn net.Conn, sess *session.Session, uuid, remoteIP s
 			}
 
 		case magicRDPI:
-			// Ping from host → reply with Pong immediately (simpler than forwarding)
-			pong := magicRDPP
-			if _, err := conn.Write(pong[:]); err != nil {
+			// Ping from host → reply with Pong using mutex to avoid race with input packets
+			if err := hc.SendToHost(magicRDPP[:]); err != nil {
 				return
 			}
 
