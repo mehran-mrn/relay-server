@@ -98,8 +98,11 @@ func (m *Manager) RegisterHost(uuid string, host HostConn) (*Session, bool) {
 		sess := val.(*Session)
 		sess.mu.Lock()
 		if sess.Host != nil {
+			old := sess.Host
+			sess.Host = host
 			sess.mu.Unlock()
-			return nil, false // already has a host
+			old.Close() // قدیمی رو ببند
+			return sess, true
 		}
 		sess.Host = host
 		sess.mu.Unlock()
