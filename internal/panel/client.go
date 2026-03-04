@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -42,9 +44,14 @@ func NewClient(baseURL, apiKey string, timeout time.Duration) *Client {
 // Authenticate checks with the panel if the UUID+Key combo is valid
 // connType is "host" or "viewer"
 func (c *Client) Authenticate(ctx context.Context, uuid, key, connType string) (*AuthResponse, error) {
-	url := fmt.Sprintf("%s/api/relay/auth?uuid=%s&key=%s&type=%s", c.baseURL, uuid, key, connType)
+	params := fmt.Sprintf("uuid=%s&key=%s&type=%s",
+		url.QueryEscape(uuid),
+		url.QueryEscape(key),
+		url.QueryEscape(connType),
+	)
+	fullURL := fmt.Sprintf("%s/api/relay/auth?%s", c.baseURL, params)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -52,15 +59,18 @@ func (c *Client) Authenticate(ctx context.Context, uuid, key, connType string) (
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		log.Printf("[Panel] Auth request failed UUID=%s: %v", uuid, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	var authResp AuthResponse
 	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
+		log.Printf("[Panel] Auth response decode failed UUID=%s status=%d: %v", uuid, resp.StatusCode, err)
 		return nil, err
 	}
 
+	log.Printf("[Panel] Auth UUID=%s type=%s allowed=%v reason=%s", uuid, connType, authResp.Allowed, authResp.Reason)
 	return &authResp, nil
 }
 
