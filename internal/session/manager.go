@@ -91,17 +91,18 @@ func NewManager() *Manager {
 }
 
 // GetOrCreateForHost returns existing session or creates new one, sets Host.
-// Returns false if UUID already has a host connected.
+// If UUID already has a host, the old host is replaced (reconnect support).
 func (m *Manager) RegisterHost(uuid string, host HostConn) (*Session, bool) {
 	// Try to load existing session
 	if val, ok := m.sessions.Load(uuid); ok {
 		sess := val.(*Session)
 		sess.mu.Lock()
 		if sess.Host != nil {
+			// Close old host and replace — supports reconnect with same UUID
 			old := sess.Host
 			sess.Host = host
 			sess.mu.Unlock()
-			old.Close() // قدیمی رو ببند
+			old.Close()
 			return sess, true
 		}
 		sess.Host = host
@@ -150,14 +151,22 @@ func (m *Manager) RegisterViewer(uuid string, viewer ViewerConn) (*Session, bool
 	return sess, true
 }
 
-// UnregisterHost removes host from session and cleans up if viewer is also gone
-func (m *Manager) UnregisterHost(uuid string) *Session {
+// UnregisterHost removes host from session only if it matches the given connection.
+// This prevents a reconnecting host from removing the newly registered session.
+func (m *Manager) UnregisterHost(uuid string, host HostConn) *Session {
 	val, ok := m.sessions.Load(uuid)
 	if !ok {
 		return nil
 	}
 	sess := val.(*Session)
 	sess.mu.Lock()
+
+	// Only unregister if this is still the same host connection
+	if sess.Host != host {
+		sess.mu.Unlock()
+		return nil // new host already registered, don't touch it
+	}
+
 	sess.Host = nil
 	viewer := sess.Viewer
 	sess.mu.Unlock()

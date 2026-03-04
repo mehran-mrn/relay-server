@@ -171,14 +171,17 @@ func (s *Server) handleConnection(conn net.Conn) {
 func (s *Server) readLoop(conn net.Conn, hc *hostConn, sess *session.Session, uuid, remoteIP string) {
 	defer func() {
 		conn.Close()
-		s.sessions.UnregisterHost(uuid)
-		s.panel.SendEvent(uuid, "host", "host_disconnected", remoteIP)
-		log.Printf("[TCP] Host disconnected: UUID=%s", uuid)
-
-		// Notify viewer
-		if viewer := sess.GetViewer(); viewer != nil {
-			viewer.SendHostStatus(false)
-			viewer.Close()
+		unregistered := s.sessions.UnregisterHost(uuid, hc)
+		if unregistered != nil {
+			s.panel.SendEvent(uuid, "host", "host_disconnected", remoteIP)
+			log.Printf("[TCP] Host disconnected: UUID=%s", uuid)
+			// Notify viewer only if this was the active host
+			if viewer := sess.GetViewer(); viewer != nil {
+				viewer.SendHostStatus(false)
+				viewer.Close()
+			}
+		} else {
+			log.Printf("[TCP] Host replaced (reconnect): UUID=%s", uuid)
 		}
 	}()
 
